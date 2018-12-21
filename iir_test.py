@@ -35,13 +35,39 @@ def apply_iir3(seq, b3, a3, mr=None, mt=None):
     return ret
 
 
+def apply_iir3_m(seq, b3, a3, mr=None, mt=None):
+    regi = 2
+    argi = 2
+    ret = []
+    b3 = [AcFixed(16, argi, True, i) for i in b3]
+    a3 = [AcFixed(16, argi, True, i) for i in a3]
+    print('quantlized a3 b3:', a3, b3)
+    t = AcFixed(16, 1, True, 0)
+    reg1 = AcFixed(16, regi, True, 0)
+    reg2 = AcFixed(16, regi, True, 0)
+    for i in seq:
+        t = b3[0] * i + reg1
+        t = t.to_fixed(16, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mt)
+        reg1 = b3[1] * i + reg2 - a3[1] * t
+        reg1 = reg1.to_fixed(16, regi, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mr)
+        reg2 = b3[2] * i - a3[2] * t
+        reg2 = reg2.to_fixed(16, regi, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mr)
+
+        r = t
+        ret.append(r)
+
+    return ret
+
+
 def test_iir3x3(seq):
     b3 = [0.9819946289062, -1.963989257812, 0.9819946289062]
     a3 = [1, -1.963989257812, 0.964599609375]
 
-    r1 = apply_iir3(seq, b3, a3, iir3_m_r1, iir3_m_t1)
-    # r1 = apply_iir3(r1, b3, a3, iir3_m_r2, iir3_m_t2)
-    # r1 = apply_iir3(r1, b3, a3, iir3_m_r3, iir3_m_t3)
+    r1 = apply_iir3_m(seq, b3, a3, iir3_m_r1, iir3_m_t1)
+    # r1 = apply_iir3_m(r1, b3, a3, iir3_m_r2, iir3_m_t2)
+    # r1 = apply_iir3_m(r1, b3, a3, iir3_m_r3, iir3_m_t3)
+    # r1 = apply_iir3_m(r1, b3, a3, iir3_m_r3, iir3_m_t3)
+    # r1 = apply_iir3_m(r1, b3, a3, iir3_m_r3, iir3_m_t3)
 
     print('ret err db', err_sqr_db(r1))
     return r1
@@ -95,6 +121,8 @@ def eng(seq):
 #     r1 = apply_iir7(seq, b7, a7, 7)
 #     print('err 7', err_sqr_db(r1))
 #     return r1
+#
+
 
 
 if __name__ == '__main__':
