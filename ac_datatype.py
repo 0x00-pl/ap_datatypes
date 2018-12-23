@@ -99,13 +99,13 @@ class AcFixed(Quantize):
     def quant(self, qvalue_shifted):
         f = self.W - self.I
         if self.S:
-            self.mem = int(qvalue_shifted)
+            self.mem = int(round(qvalue_shifted))
             if qvalue_shifted < (-(1 << (self.W - 1))) or qvalue_shifted > ((1 << (self.W - 1))):
                 raise ValueError(
                     'out of range, {} {} W={} I={} S={}'
                         .format(qvalue_shifted / (1 << f), qvalue_shifted, self.W, self.I, self.S))
         else:
-            self.mem = int(qvalue_shifted)
+            self.mem = int(round(qvalue_shifted))
             if qvalue_shifted < 0 or qvalue_shifted > ((1 << self.W)):
                 raise ValueError(
                     'out of range, {} {} W={} I={} S={}'

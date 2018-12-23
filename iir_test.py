@@ -35,23 +35,24 @@ def apply_iir3(seq, b3, a3, mr=None, mt=None):
     return ret
 
 
-def apply_iir3_m(seq, b3, a3, mr=None, mt=None):
-    regi = 2
-    argi = 2
+def apply_iir3_m(seq, b3, a3, arg_pow, mr=None, mt=None):
     ret = []
-    b3 = [AcFixed(16, argi, True, i) for i in b3]
-    a3 = [AcFixed(16, argi, True, i) for i in a3]
+    b3 = [i / (2 ** arg_pow) for i in b3]
+    a3 = [i / (2 ** arg_pow) for i in a3]
+    b3 = [AcFixed(16, 1, True, i) for i in b3]
+    a3 = [AcFixed(16, 1, True, i) for i in a3]
     print('quantlized a3 b3:', a3, b3)
     t = AcFixed(16, 1, True, 0)
-    reg1 = AcFixed(16, regi, True, 0)
-    reg2 = AcFixed(16, regi, True, 0)
+    reg1 = AcFixed(16, 1, True, 0)
+    reg2 = AcFixed(16, 1, True, 0)
     for i in seq:
         t = b3[0] * i + reg1
-        t = t.to_fixed(16, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mt)
-        reg1 = b3[1] * i + reg2 - a3[1] * t
-        reg1 = reg1.to_fixed(16, regi, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mr)
-        reg2 = b3[2] * i - a3[2] * t
-        reg2 = reg2.to_fixed(16, regi, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mr)
+        t = t << arg_pow
+        r = t.to_fixed(16, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mt)
+        reg1 = b3[1] * i + reg2 - a3[1] * r
+        reg1 = reg1.to_fixed(16, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mr)
+        reg2 = b3[2] * i - a3[2] * r
+        reg2 = reg2.to_fixed(16, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mr)
 
         r = t
         ret.append(r)
@@ -62,12 +63,13 @@ def apply_iir3_m(seq, b3, a3, mr=None, mt=None):
 def test_iir3x3(seq):
     b3 = [0.9819946289062, -1.963989257812, 0.9819946289062]
     a3 = [1, -1.963989257812, 0.964599609375]
+    arg_pow = math.ceil(math.log2(max(1, *[abs(i) for i in a3], *[abs(i) for i in b3])))
 
-    r1 = apply_iir3_m(seq, b3, a3, iir3_m_r1, iir3_m_t1)
-    # r1 = apply_iir3_m(r1, b3, a3, iir3_m_r2, iir3_m_t2)
-    # r1 = apply_iir3_m(r1, b3, a3, iir3_m_r3, iir3_m_t3)
-    # r1 = apply_iir3_m(r1, b3, a3, iir3_m_r3, iir3_m_t3)
-    # r1 = apply_iir3_m(r1, b3, a3, iir3_m_r3, iir3_m_t3)
+    r1 = apply_iir3_m(seq, b3, a3, arg_pow, iir3_m_r1, iir3_m_t1)
+    # r1 = apply_iir3_m(r1, b3, a3, arg_pow, iir3_m_r2, iir3_m_t2)
+    # r1 = apply_iir3_m(r1, b3, a3, arg_pow, iir3_m_r3, iir3_m_t3)
+    # r1 = apply_iir3_m(r1, b3, a3, arg_pow, iir3_m_r3, iir3_m_t3)
+    # r1 = apply_iir3_m(r1, b3, a3, arg_pow, iir3_m_r3, iir3_m_t3)
 
     print('ret err db', err_sqr_db(r1))
     return r1
@@ -124,9 +126,8 @@ def eng(seq):
 #
 
 
-
 if __name__ == '__main__':
-    seq = [i * 2 * math.pi / 48000 * 6000 for i in range(4800)]
+    seq = [i * 2 * math.pi / 48000 * 100 for i in range(4800)]
     seq = [math.sin(i) for i in seq]
     seq = [1] * len(seq)
     seq = [AcFixed(16, 1, True, i) for i in seq]
