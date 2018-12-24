@@ -41,7 +41,7 @@ def apply_iir3_m(seq, b3, a3, arg_pow, mr=None, mt=None):
     a3 = [i / (2 ** arg_pow) for i in a3]
     b3 = [AcFixed(16, 1, True, i) for i in b3]
     a3 = [AcFixed(16, 1, True, i) for i in a3]
-    print('quantlized a3 b3:', a3, b3)
+    # print('quantlized a3 b3:', a3, b3)
     t = AcFixed(16, 1, True, 0)
     reg1 = AcFixed(16, 1, True, 0)
     reg2 = AcFixed(16, 1, True, 0)
@@ -61,14 +61,19 @@ def apply_iir3_m(seq, b3, a3, arg_pow, mr=None, mt=None):
 
 
 def test_iir3x3(seq):
-    b3 = [0.9819946289062, -1.963989257812, 0.9819946289062]
-    a3 = [1, -1.963989257812, 0.964599609375]
+    b3 = [0.982, -1.964, 0.982]
+    b3 = [i / 1.3 for i in b3]
+    a3 = [1, -1.964, 0.9646]
     arg_pow = math.ceil(math.log2(max(1, *[abs(i) for i in a3], *[abs(i) for i in b3])))
 
     r1 = apply_iir3_m(seq, b3, a3, arg_pow, iir3_m_r1, iir3_m_t1)
-    # r1 = apply_iir3_m(r1, b3, a3, arg_pow, iir3_m_r2, iir3_m_t2)
+    r1 = apply_iir3_m(r1, [1.3, 0, 0], [1, 0, 0], arg_pow, iir3_m_r2, iir3_m_t2)
+    r1 = apply_iir3_m(r1, b3, a3, arg_pow, iir3_m_r3, iir3_m_t3)
+    r1 = apply_iir3_m(r1, [1.3, 0, 0], [1, 0, 0], arg_pow, iir3_m_r3, iir3_m_t3)
     # r1 = apply_iir3_m(r1, b3, a3, arg_pow, iir3_m_r3, iir3_m_t3)
+    # r1 = apply_iir3_m(r1, [1.3, 0, 0], [1, 0, 0], arg_pow, iir3_m_r2, iir3_m_t2)
     # r1 = apply_iir3_m(r1, b3, a3, arg_pow, iir3_m_r3, iir3_m_t3)
+    # r1 = apply_iir3_m(r1, [1.3, 0, 0], [1, 0, 0], arg_pow, iir3_m_r2, iir3_m_t2)
     # r1 = apply_iir3_m(r1, b3, a3, arg_pow, iir3_m_r3, iir3_m_t3)
 
     print('ret err db', err_sqr_db(r1))
@@ -125,11 +130,21 @@ def eng(seq):
 #     return r1
 #
 
+def test_all_freq():
+    for freq in range(0, 24000, 100):
+        seq = [math.sin(i * 2 * math.pi / 48000 * freq) for i in range(1000)]
+        seq = [AcFixed(16, 1, True, i) for i in seq]
+        print('seq {} err db'.format(freq), err_sqr_db(seq))
+        r1 = test_iir3x3(seq)
+        print('ret {} eng'.format(freq), eng(r1), eng(seq))
+
 
 if __name__ == '__main__':
-    seq = [i * 2 * math.pi / 48000 * 100 for i in range(4800)]
+    test_all_freq()
+    exit()
+    seq = [i * 2 * math.pi / 48000 * 400 for i in range(4800)]
     seq = [math.sin(i) for i in seq]
-    seq = [1] * len(seq)
+    # seq = [1] * len(seq)
     seq = [AcFixed(16, 1, True, i) for i in seq]
 
     print('seq err db', err_sqr_db(seq))
