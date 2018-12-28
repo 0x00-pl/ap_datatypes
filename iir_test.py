@@ -1,5 +1,3 @@
-import random
-
 import math
 
 import audio_export
@@ -49,8 +47,8 @@ def apply_iir3_m(seq, b3, a3, arg_pow, mr=None, mt=None):
     ret = []
     b3 = [i / (2 ** arg_pow) for i in b3]
     a3 = [i / (2 ** arg_pow) for i in a3]
-    b3 = [AcFixed(16, 1, True, i) for i in b3]
-    a3 = [AcFixed(16, 1, True, i) for i in a3]
+    b3 = [AcFixed(32, 1, True, i) for i in b3]
+    a3 = [AcFixed(32, 1, True, i) for i in a3]
     # print('quantlized a3 b3:', a3, b3)
     t = AcFixed(16, 1, True, 0)
     reg1 = AcFixed(16, 1, True, 0)
@@ -60,9 +58,9 @@ def apply_iir3_m(seq, b3, a3, arg_pow, mr=None, mt=None):
         t = t << arg_pow
         r = t.to_fixed(16, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mt)
         reg1 = b3[1] * i + reg2 - a3[1] * r
-        reg1 = reg1.to_fixed(16, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mr)
+        reg1 = reg1.to_fixed(32, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mr)
         reg2 = b3[2] * i - a3[2] * r
-        reg2 = reg2.to_fixed(16, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mr)
+        reg2 = reg2.to_fixed(32, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mr)
 
         ret.append(r)
 
@@ -196,19 +194,33 @@ def test_all_freq():
         print('ret {} eng'.format(freq), eng(r1), eng(seq))
 
 
+def plot_wave(w, post_fix=''):
+    try:
+        import matlab
+        from matlab import engine
+        enge = engine.connect_matlab()
+        enge.workspace['quanted' + post_fix] = matlab.double([i.dequant() for i in w])
+        enge.workspace['value' + post_fix] = matlab.double([i.value for i in w])
+        enge.eval('signalAnalyzer', nargout=0)
+    except:
+        pass
+
+
 if __name__ == '__main__':
     # test_all_freq()
     # exit()
-    seq = [i * 2 * math.pi / 48000 * 150 for i in range(4800)]
-    seq = [math.sin(i)/4 for i in seq]
-    #seq = [1] * len(seq)
+    # seq = [i * 2 * math.pi / 48000 * 150 for i in range(4800)]
+    # seq = [math.sin(i)/4 for i in seq]
+    # seq = [1] * len(seq)
     # seq = [1e-4*(random.random()-0.5) for i in seq]
-    seq = audio_export.data
-    seq = [AcFixed(16, 1, True, i/2+0.5) for i in seq]
+    seq = [0] * 1000 + audio_export.data
+    seq = [AcFixed(16, 1, True, v / 2 + math.sin(i * 2 * math.pi * 50 / 48000) / 4) for v, i in
+           zip(seq, range(len(seq)))]
 
     print('seq err db', err_sqr_db(seq))
     r1 = test_iir3x3(seq)
     # r2 = test_iir7(seq)
+    plot_wave(r1, '32m')
     print()
     print('seq eng', eng(seq))
     print('ret eng', eng(r1))
