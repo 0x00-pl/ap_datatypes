@@ -22,44 +22,47 @@ iir7_m_t = monitor.ErrorMonitor('irr7_m_t')
 
 
 # import numpy as np
-
-def apply_iir3(seq, b3, a3, mr=None, mt=None):
-    ret = []
-    b3 = [AcFixed(16, 2, True, i) for i in b3]
-    a3 = [AcFixed(16, 2, True, i) for i in a3]
-    print('quantlized a3 b3:', a3, b3)
-    t = AcFixed(16, 1, True, 0)
-    reg1 = AcFixed(16, 1, True, 0)
-    reg2 = AcFixed(16, 1, True, 0)
-    for i in seq:
-        t = a3[0] * i - a3[1] * reg1 - a3[2] * reg2
-        r = b3[0] * t + b3[1] * reg1 + b3[2] * reg2
-        # print(t.value, end=' ')
-        r = r.to_fixed(16, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mr)
-        ret.append(r)
-        reg2 = reg1
-        reg1 = t.to_fixed(16, 13, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mt)
-
-    return ret
+#
+# def apply_iir3(seq, b3, a3, mr=None, mt=None):
+#     ret = []
+#     b3 = [AcFixed(16, 2, True, i) for i in b3]
+#     a3 = [AcFixed(16, 2, True, i) for i in a3]
+#     print('quantlized a3 b3:', a3, b3)
+#     t = AcFixed(16, 1, True, 0)
+#     reg1 = AcFixed(16, 1, True, 0)
+#     reg2 = AcFixed(16, 1, True, 0)
+#     for i in seq:
+#         t = a3[0] * i - a3[1] * reg1 - a3[2] * reg2
+#         r = b3[0] * t + b3[1] * reg1 + b3[2] * reg2
+#         # print(t.value, end=' ')
+#         r = r.to_fixed(16, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mr)
+#         ret.append(r)
+#         reg2 = reg1
+#         reg1 = t.to_fixed(16, 13, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mt)
+#
+#     return ret
 
 
 def apply_iir3_m(seq, b3, a3, arg_pow, mr=None, mt=None):
     ret = []
     b3 = [i / (2 ** arg_pow) for i in b3]
     a3 = [i / (2 ** arg_pow) for i in a3]
-    b3 = [AcFixed(32, 1, True, i) for i in b3]
-    a3 = [AcFixed(32, 1, True, i) for i in a3]
+    b3 = [AcFixed(16, 1, True, i) for i in b3]
+    a3 = [AcFixed(16, 1, True, i) for i in a3]
     # print('quantlized a3 b3:', a3, b3)
     t = AcFixed(16, 1, True, 0)
     reg1 = AcFixed(16, 1, True, 0)
     reg2 = AcFixed(16, 1, True, 0)
     for i in seq:
+        if not isinstance(i, AcFixed):
+            i = AcFixed(16, 1, True, i)
         t = b3[0] * i + reg1
         t = t << arg_pow
+        t = t.to_fixed(16, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mt)
         r = t.to_fixed(16, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mt)
-        reg1 = b3[1] * i + reg2 - a3[1] * r
+        reg1 = b3[1] * i + reg2 - a3[1] * t
         reg1 = reg1.to_fixed(32, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mr)
-        reg2 = b3[2] * i - a3[2] * r
+        reg2 = b3[2] * i - a3[2] * t
         reg2 = reg2.to_fixed(32, 1, True, AcFixed.QuantizationMode.RND, AcFixed.OverflowMode.SAT, mr)
 
         ret.append(r)
@@ -68,9 +71,13 @@ def apply_iir3_m(seq, b3, a3, arg_pow, mr=None, mt=None):
 
 
 def test_iir3x3(seq):
-    # b3 = [0.982, -1.964, 0.982]
+    b3 = [0.982, -1.964, 0.982]
     # b3 = [i / 1.3 for i in b3]
-    # a3 = [1, -1.964, 0.9646]
+    a3 = [1, -1.964, 0.9646]
+    r1 = apply_iir3_m(seq, b3, a3, 1, iir3_m_r1, iir3_m_t1)
+    return r1
+
+    # # c
     # sos = [
     #     [1, - 1.99993896484375, 1, 1, - 1.99774169921875, 0.997863769531250],
     #     [1, - 1.99993896484375, 1, 1, - 1.99145507812500, 0.991638183593750],
@@ -83,18 +90,20 @@ def test_iir3x3(seq):
     #     0.988403320312500,
     #     1.59375
     # ]
-    sos = [
-        [1, - 1.99993896484375, 1, 1, - 1.99768066406250, 0.997802734375000],
-        [1, - 2, 1, 1, - 1.99127197265625, 0.991455078125000],
-        [1, - 2, 1, 1, - 1.97631835937500, 0.976623535156250],
-        [1, - 1, 0, 1, - 0.978881835937500, 0]
-    ]
-    g = [
-        0.612609863281250,
-        0.995666503906250,
-        0.988220214843750,
-        1.61322021484375
-    ]
+
+    # #b
+    # sos = [
+    #     [1, - 1.99993896484375, 1, 1, - 1.99768066406250, 0.997802734375000],
+    #     [1, - 2, 1, 1, - 1.99127197265625, 0.991455078125000],
+    #     [1, - 2, 1, 1, - 1.97631835937500, 0.976623535156250],
+    #     [1, - 1, 0, 1, - 0.978881835937500, 0]
+    # ]
+    # g = [
+    #     0.612609863281250,
+    #     0.995666503906250,
+    #     0.988220214843750,
+    #     1.61322021484375
+    # ]
     a = []
     b = []
     for ab, ig in zip(sos, g):
@@ -202,7 +211,7 @@ def plot_wave(w, post_fix=''):
         enge.workspace['quanted' + post_fix] = matlab.double([i.dequant() for i in w])
         enge.workspace['value' + post_fix] = matlab.double([i.value for i in w])
         enge.eval('signalAnalyzer', nargout=0)
-    except:
+    except Exception as e:
         pass
 
 
@@ -211,23 +220,27 @@ if __name__ == '__main__':
     # exit()
     # seq = [i * 2 * math.pi / 48000 * 150 for i in range(4800)]
     # seq = [math.sin(i)/4 for i in seq]
-    # seq = [1] * len(seq)
+    seq = [0.2] * 4096
     # seq = [1e-4*(random.random()-0.5) for i in seq]
-    seq = [0] * 1000 + audio_export.data
-    seq = [AcFixed(16, 1, True, v / 2 + math.sin(i * 2 * math.pi * 50 / 48000) / 4) for v, i in
-           zip(seq, range(len(seq)))]
+    # seq = [1] * 1000 + audio_export.data
 
-    print('seq err db', err_sqr_db(seq))
+    # seq = [AcFixed(32, 1, True, v / 2 + math.sin(i * 2 * math.pi * 500 / 48000) / 4) for v, i in
+    #        zip(seq, range(len(seq)))]
+    # print('seq values:', [i.dequant() for i in seq])
+
+    #
+    # print('seq err db', err_sqr_db(seq))
     r1 = test_iir3x3(seq)
     # r2 = test_iir7(seq)
-    plot_wave(r1, '32m')
+    # plot_wave(r1, '32m2')
     print()
-    print('seq eng', eng(seq))
-    print('ret eng', eng(r1))
+    # print('seq eng', eng(seq))
+    # print('ret eng', eng(r1))
     # print('eng', eng(r2))
     print()
     print('seq values:', [i for i in seq[1100:1200]])
     print('ret values:', [i for i in r1[1100:1200]])
+    print('ret values:', [i.dequant() for i in r1], ';')
     # print([i for i in r2[1100:1200]])
     print()
     print(iir3_m_t1)
